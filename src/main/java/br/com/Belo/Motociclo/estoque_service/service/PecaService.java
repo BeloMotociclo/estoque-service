@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -35,8 +36,9 @@ public class PecaService {
     }
 
     public Page<PecaResponseDTO> listar(Pageable pageable) {
-        return repository.findAll(pageable).map(mapper::toResponseDTO);
+        return repository.findAllByAtivoTrue(pageable).map(mapper::toResponseDTO);
     }
+
     public PecaResponseDTO atualizar(UUID id, PecaRequestDTO dto) {
         Peca peca = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada"));

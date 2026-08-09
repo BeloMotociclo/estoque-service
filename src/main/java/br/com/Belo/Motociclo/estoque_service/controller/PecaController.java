@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/pecas")
+@RequestMapping("/v1/pecas")
 public class PecaController {
 
     private final PecaService service;
@@ -36,6 +36,7 @@ public class PecaController {
     public ResponseEntity<Page<PecaResponseDTO>> listar(Pageable pageable) {
         return ResponseEntity.ok(service.listar(pageable));
     }
+
     @PutMapping("/{id}")
     public ResponseEntity<PecaResponseDTO> atualizar(
             @PathVariable UUID id,
