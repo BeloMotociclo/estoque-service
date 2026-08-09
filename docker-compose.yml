@@ -1,0 +1,23 @@
+services:
+  db-estoque:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: estoque
+      POSTGRES_USER: estoque_user
+      POSTGRES_PASSWORD: estoque_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_estoque_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"    # porta que sua aplicação Spring usa pra conectar
+      - "15672:15672"  # porta do painel visual de administração
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+
+volumes:
+  db_estoque_data:
