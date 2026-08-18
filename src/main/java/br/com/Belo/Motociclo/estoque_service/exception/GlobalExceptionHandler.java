@@ -18,6 +18,18 @@ public class GlobalExceptionHandler {
                 .body(Map.of("erro", ex.getMessage()));
     }
 
+    @ExceptionHandler(RegraNegocioException.class)
+    public ResponseEntity<Map<String, String>> handleRegraNegocio(RegraNegocioException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("erro", ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleArgumentoInvalido(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("erro", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidacao(MethodArgumentNotValidException ex) {
         Map<String, String> erros = new HashMap<>();

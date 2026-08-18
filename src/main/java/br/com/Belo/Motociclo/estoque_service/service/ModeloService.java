@@ -2,8 +2,10 @@ package br.com.Belo.Motociclo.estoque_service.service;
 
 import br.com.Belo.Motociclo.estoque_service.dto.ModeloRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ModeloResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.Modelo;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
+import br.com.Belo.Motociclo.estoque_service.exception.RegraNegocioException;
 import br.com.Belo.Motociclo.estoque_service.repository.ModeloRepository;
 import org.springframework.stereotype.Service;
 
@@ -13,18 +15,22 @@ import java.util.List;
 public class ModeloService {
 
     private final ModeloRepository repository;
+    private final LogAlteracaoService logService;
 
-    public ModeloService(ModeloRepository repository) {
+    public ModeloService(ModeloRepository repository, LogAlteracaoService logService) {
         this.repository = repository;
+        this.logService = logService;
     }
 
     public ModeloResponseDTO criar(ModeloRequestDTO dto) {
         if (repository.existsByNome(dto.nome())) {
-            throw new RuntimeException("Modelo já cadastrado");
+            throw new RegraNegocioException("Modelo já cadastrado");
         }
         Modelo modelo = new Modelo();
         modelo.setNome(dto.nome());
         Modelo salvo = repository.save(modelo);
+        logService.registrar("Modelo", salvo.getId().toString(), AcaoLog.CRIACAO,
+                "Modelo criado: " + salvo.getNome());
         return new ModeloResponseDTO(salvo.getId(), salvo.getNome());
     }
 
@@ -39,7 +45,10 @@ public class ModeloService {
         Modelo modelo = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Modelo não encontrado"));
         modelo.setNome(dto.nome());
-        return new ModeloResponseDTO(repository.save(modelo).getId(), modelo.getNome());
+        Modelo salvo = repository.save(modelo);
+        logService.registrar("Modelo", salvo.getId().toString(), AcaoLog.EDICAO,
+                "Modelo atualizado: " + salvo.getNome());
+        return new ModeloResponseDTO(salvo.getId(), salvo.getNome());
     }
 
     public void deletar(Long id) {
@@ -47,5 +56,6 @@ public class ModeloService {
             throw new RecursoNaoEncontradoException("Modelo não encontrado");
         }
         repository.deleteById(id);
+        logService.registrar("Modelo", id.toString(), AcaoLog.EXCLUSAO, "Modelo removido");
     }
 }

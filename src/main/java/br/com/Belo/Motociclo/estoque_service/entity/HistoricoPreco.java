@@ -34,6 +34,4 @@ public class HistoricoPreco extends BaseEntity {
 
     @Column(nullable = false)
     private LocalDate data;
-
-    // getters e setters
 }

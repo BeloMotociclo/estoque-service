@@ -4,11 +4,13 @@ import br.com.Belo.Motociclo.estoque_service.dto.HistoricoPrecoResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ItemNotaFiscalDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalImportadaDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.Fornecedor;
 import br.com.Belo.Motociclo.estoque_service.entity.HistoricoPreco;
 import br.com.Belo.Motociclo.estoque_service.entity.NotaFiscal;
 import br.com.Belo.Motociclo.estoque_service.entity.Peca;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
+import br.com.Belo.Motociclo.estoque_service.exception.RegraNegocioException;
 import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.HistoricoPrecoRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.NotaFiscalRepository;
@@ -38,15 +40,18 @@ public class NotaFiscalService {
     private final FornecedorRepository fornecedorRepository;
     private final PecaRepository pecaRepository;
     private final HistoricoPrecoRepository historicoPrecoRepository;
+    private final LogAlteracaoService logService;
 
     public NotaFiscalService(NotaFiscalRepository notaFiscalRepository,
                              FornecedorRepository fornecedorRepository,
                              PecaRepository pecaRepository,
-                             HistoricoPrecoRepository historicoPrecoRepository) {
+                             HistoricoPrecoRepository historicoPrecoRepository,
+                             LogAlteracaoService logService) {
         this.notaFiscalRepository = notaFiscalRepository;
         this.fornecedorRepository = fornecedorRepository;
         this.pecaRepository = pecaRepository;
         this.historicoPrecoRepository = historicoPrecoRepository;
+        this.logService = logService;
     }
 
     // Importação do XML da NF-e
@@ -81,7 +86,7 @@ public class NotaFiscalService {
             return new NotaFiscalImportadaDTO(numero, chaveAcesso, cnpjFornecedor, valorTotal, data, itens);
 
         } catch (Exception e) {
-            throw new RuntimeException("Erro ao processar XML da NF-e: " + e.getMessage());
+            throw new IllegalArgumentException("Erro ao processar XML da NF-e: " + e.getMessage());
         }
     }
 
@@ -95,11 +100,11 @@ public class NotaFiscalService {
                         "Fornecedor com CNPJ " + dadosXml.cnpjFornecedor() + " não cadastrado"));
 
         if (dadosXml.chaveAcesso() != null && notaFiscalRepository.existsByChaveAcesso(dadosXml.chaveAcesso())) {
-            throw new RuntimeException("Nota fiscal já importada anteriormente");
+            throw new RegraNegocioException("Nota fiscal já importada anteriormente");
         }
 
         if (notaFiscalRepository.existsByFornecedorIdAndNumero(fornecedor.getId(), dadosXml.numero())) {
-            throw new RuntimeException("Nota fiscal já importada anteriormente");
+            throw new RegraNegocioException("Nota fiscal já importada anteriormente");
         }
 
         // Salva a nota fiscal
@@ -150,6 +155,8 @@ public class NotaFiscalService {
         }
 
         NotaFiscal notaFinal = nota;
+        logService.registrar("NotaFiscal", notaFinal.getId().toString(), AcaoLog.CRIACAO,
+                "Nota fiscal importada: " + notaFinal.getNumero());
         return new NotaFiscalResponseDTO(
                 notaFinal.getId(), fornecedor.getId(), fornecedor.getNome(),
                 notaFinal.getNumero(), notaFinal.getChaveAcesso(),
@@ -162,7 +169,7 @@ public class NotaFiscalService {
                 new NotaFiscalResponseDTO(
                         nota.getId(), nota.getFornecedor().getId(), nota.getFornecedor().getNome(),
                         nota.getNumero(), nota.getChaveAcesso(), nota.getValorTotal(), nota.getData(),
-                        historicoPrecoRepository.findByPecaIdOrderByDataDesc(nota.getId())
+                        historicoPrecoRepository.findByNotaFiscalIdOrderByDataDesc(nota.getId())
                                 .stream()
                                 .map(h -> new HistoricoPrecoResponseDTO(
                                         h.getId(), h.getPeca().getId(), h.getPeca().getCodigo(),

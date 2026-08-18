@@ -2,6 +2,7 @@ package br.com.Belo.Motociclo.estoque_service.service;
 
 import br.com.Belo.Motociclo.estoque_service.dto.ContatoRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ContatoResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.Contato;
 import br.com.Belo.Motociclo.estoque_service.entity.Fornecedor;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
@@ -17,10 +18,14 @@ public class ContatoService {
 
     private final ContatoRepository contatoRepository;
     private final FornecedorRepository fornecedorRepository;
+    private final LogAlteracaoService logService;
 
-    public ContatoService(ContatoRepository contatoRepository, FornecedorRepository fornecedorRepository) {
+    public ContatoService(ContatoRepository contatoRepository,
+                          FornecedorRepository fornecedorRepository,
+                          LogAlteracaoService logService) {
         this.contatoRepository = contatoRepository;
         this.fornecedorRepository = fornecedorRepository;
+        this.logService = logService;
     }
 
     public ContatoResponseDTO adicionar(UUID fornecedorId, ContatoRequestDTO dto) {
@@ -32,7 +37,10 @@ public class ContatoService {
         c.setTelefone(dto.telefone());
         c.setEmail(dto.email());
         c.setCargo(dto.cargo());
-        return toDTO(contatoRepository.save(c));
+        Contato salvo = contatoRepository.save(c);
+        logService.registrar("Contato", salvo.getId().toString(), AcaoLog.CRIACAO,
+                "Contato adicionado: " + salvo.getNome());
+        return toDTO(salvo);
     }
 
     public List<ContatoResponseDTO> listarPorFornecedor(UUID fornecedorId) {
@@ -47,7 +55,10 @@ public class ContatoService {
         c.setTelefone(dto.telefone());
         c.setEmail(dto.email());
         c.setCargo(dto.cargo());
-        return toDTO(contatoRepository.save(c));
+        Contato salvo = contatoRepository.save(c);
+        logService.registrar("Contato", salvo.getId().toString(), AcaoLog.EDICAO,
+                "Contato atualizado: " + salvo.getNome());
+        return toDTO(salvo);
     }
 
     public void remover(Long id) {
@@ -55,6 +66,7 @@ public class ContatoService {
             throw new RecursoNaoEncontradoException("Contato não encontrado");
         }
         contatoRepository.deleteById(id);
+        logService.registrar("Contato", id.toString(), AcaoLog.EXCLUSAO, "Contato removido");
     }
 
     private ContatoResponseDTO toDTO(Contato c) {

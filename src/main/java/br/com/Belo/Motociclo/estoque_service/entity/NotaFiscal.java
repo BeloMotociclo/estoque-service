@@ -36,7 +36,5 @@ public class NotaFiscal extends BaseEntity {
 
     @Column(nullable = false)
     private Boolean ativo = true;
-
-    // getters e setters
 }
 

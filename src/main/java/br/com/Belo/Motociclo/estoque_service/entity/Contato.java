@@ -24,6 +24,4 @@ public class Contato extends BaseEntity {
     private String telefone;
     private String email;
     private String cargo;
-
-    // getters e setters
 }

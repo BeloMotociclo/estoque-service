@@ -1,6 +1,7 @@
 package br.com.Belo.Motociclo.estoque_service.service;
 
 import br.com.Belo.Motociclo.estoque_service.dto.FotoPecaResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.FotoPeca;
 import br.com.Belo.Motociclo.estoque_service.entity.Peca;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
@@ -18,13 +19,16 @@ public class FotoPecaService {
     private final FotoPecaRepository fotoPecaRepository;
     private final PecaRepository pecaRepository;
     private final MinioService minioService;
+    private final LogAlteracaoService logService;
 
     public FotoPecaService(FotoPecaRepository fotoPecaRepository,
                            PecaRepository pecaRepository,
-                           MinioService minioService) {
+                           MinioService minioService,
+                           LogAlteracaoService logService) {
         this.fotoPecaRepository = fotoPecaRepository;
         this.pecaRepository = pecaRepository;
         this.minioService = minioService;
+        this.logService = logService;
     }
 
     public FotoPecaResponseDTO upload(UUID pecaId, MultipartFile arquivo) {
@@ -35,6 +39,7 @@ public class FotoPecaService {
         foto.setPeca(peca);
         foto.setUrl(url);
         FotoPeca salvo = fotoPecaRepository.save(foto);
+        logService.registrar("FotoPeca", salvo.getId().toString(), AcaoLog.CRIACAO, "Foto adicionada");
         return new FotoPecaResponseDTO(salvo.getId(), salvo.getUrl());
     }
 
@@ -50,5 +55,6 @@ public class FotoPecaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Foto não encontrada"));
         minioService.deletar(foto.getUrl());
         fotoPecaRepository.deleteById(id);
+        logService.registrar("FotoPeca", id.toString(), AcaoLog.EXCLUSAO, "Foto removida");
     }
 }

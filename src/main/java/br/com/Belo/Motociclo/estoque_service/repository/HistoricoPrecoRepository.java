@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface HistoricoPrecoRepository extends JpaRepository<HistoricoPreco, Long> {
     List<HistoricoPreco> findByPecaIdOrderByDataDesc(UUID pecaId);
+    List<HistoricoPreco> findByNotaFiscalIdOrderByDataDesc(UUID notaFiscalId);
 }

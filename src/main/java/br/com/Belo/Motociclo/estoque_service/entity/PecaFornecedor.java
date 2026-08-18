@@ -21,6 +21,4 @@ public class PecaFornecedor extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fornecedor_id", nullable = false)
     private Fornecedor fornecedor;
-
-    // getters e setters
 }

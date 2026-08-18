@@ -21,6 +21,4 @@ public class Serventia extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "modelo_id", nullable = false)
     private Modelo modelo;
-
-    // getters e setters
 }

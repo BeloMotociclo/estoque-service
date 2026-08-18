@@ -23,6 +23,4 @@ public abstract class BaseEntity {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
-
-    // getters e setters
 }

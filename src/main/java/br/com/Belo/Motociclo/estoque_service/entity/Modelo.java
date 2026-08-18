@@ -16,6 +16,4 @@ public class Modelo extends BaseEntity {
 
     @Column(nullable = false, unique = true)
     private String nome;
-
-    // getters e setters
 }

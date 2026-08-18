@@ -2,10 +2,12 @@ package br.com.Belo.Motociclo.estoque_service.service;
 
 import br.com.Belo.Motociclo.estoque_service.dto.PecaFornecedorRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.PecaFornecedorResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.Fornecedor;
 import br.com.Belo.Motociclo.estoque_service.entity.Peca;
 import br.com.Belo.Motociclo.estoque_service.entity.PecaFornecedor;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
+import br.com.Belo.Motociclo.estoque_service.exception.RegraNegocioException;
 import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaFornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaRepository;
@@ -20,18 +22,21 @@ public class PecaFornecedorService {
     private final PecaFornecedorRepository pecaFornecedorRepository;
     private final PecaRepository pecaRepository;
     private final FornecedorRepository fornecedorRepository;
+    private final LogAlteracaoService logService;
 
     public PecaFornecedorService(PecaFornecedorRepository pecaFornecedorRepository,
                                  PecaRepository pecaRepository,
-                                 FornecedorRepository fornecedorRepository) {
+                                 FornecedorRepository fornecedorRepository,
+                                 LogAlteracaoService logService) {
         this.pecaFornecedorRepository = pecaFornecedorRepository;
         this.pecaRepository = pecaRepository;
         this.fornecedorRepository = fornecedorRepository;
+        this.logService = logService;
     }
 
     public PecaFornecedorResponseDTO vincular(UUID pecaId, PecaFornecedorRequestDTO dto) {
         if (pecaFornecedorRepository.existsByPecaIdAndFornecedorId(pecaId, dto.fornecedorId())) {
-            throw new RuntimeException("Fornecedor já vinculado a essa peça");
+            throw new RegraNegocioException("Fornecedor já vinculado a essa peça");
         }
         Peca peca = pecaRepository.findById(pecaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada"));
@@ -41,6 +46,8 @@ public class PecaFornecedorService {
         pf.setPeca(peca);
         pf.setFornecedor(fornecedor);
         PecaFornecedor salvo = pecaFornecedorRepository.save(pf);
+        logService.registrar("PecaFornecedor", salvo.getId().toString(), AcaoLog.CRIACAO,
+                "Fornecedor vinculado: " + fornecedor.getNome());
         return new PecaFornecedorResponseDTO(salvo.getId(), fornecedor.getId(), fornecedor.getNome());
     }
 
@@ -56,5 +63,6 @@ public class PecaFornecedorService {
             throw new RecursoNaoEncontradoException("Vínculo não encontrado");
         }
         pecaFornecedorRepository.deleteById(id);
+        logService.registrar("PecaFornecedor", id.toString(), AcaoLog.EXCLUSAO, "Fornecedor desvinculado");
     }
 }

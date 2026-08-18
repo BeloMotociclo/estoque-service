@@ -27,7 +27,5 @@ public class Fornecedor extends BaseEntity {
 
     @Column(nullable = false)
     private Boolean ativo = true;
-
-    // getters e setters
 }
 

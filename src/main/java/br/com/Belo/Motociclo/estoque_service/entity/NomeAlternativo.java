@@ -20,6 +20,4 @@ public class NomeAlternativo extends BaseEntity {
 
     @Column(nullable = false)
     private String nome;
-
-    // getters e setters
 }
