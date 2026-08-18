@@ -6,6 +6,7 @@ import java.util.UUID;
 public record PecaResponseDTO(
         UUID id,
         String codigo,
+        String nome,
         Integer quantidade,
         String categoria,
         String marca,

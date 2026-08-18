@@ -3,11 +3,8 @@ package br.com.Belo.Motociclo.estoque_service.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
-import java.time.temporal.TemporalAccessor;
-import java.util.Optional;
 import java.util.UUID;
 
 @Entity
@@ -22,6 +19,9 @@ public class Peca extends BaseEntity {
 
     @Column(nullable = false, unique = true)
     private String codigo;
+
+    @Column(nullable = false)
+    private String nome;
 
     @Column(nullable = false)
     private Integer quantidade;

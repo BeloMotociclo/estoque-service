@@ -11,6 +11,7 @@ public class PecaMapper {
     public Peca toEntity(PecaRequestDTO dto) {
         Peca peca = new Peca();
         peca.setCodigo(dto.codigo());
+        peca.setNome(dto.nome());
         peca.setQuantidade(dto.quantidade());
         peca.setCategoria(dto.categoria());
         peca.setMarca(dto.marca());
@@ -20,7 +21,7 @@ public class PecaMapper {
 
     public PecaResponseDTO toResponseDTO(Peca peca) {
         return new PecaResponseDTO(
-                peca.getId(), peca.getCodigo(), peca.getQuantidade(),
+                peca.getId(), peca.getCodigo(), peca.getNome(), peca.getQuantidade(),
                 peca.getCategoria(), peca.getMarca(), peca.getPrecoVenda()
         );
     }

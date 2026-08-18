@@ -43,6 +43,7 @@ public class PecaService {
         Peca peca = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada"));
         peca.setCodigo(dto.codigo());
+        peca.setNome(dto.nome());
         peca.setQuantidade(dto.quantidade());
         peca.setCategoria(dto.categoria());
         peca.setMarca(dto.marca());

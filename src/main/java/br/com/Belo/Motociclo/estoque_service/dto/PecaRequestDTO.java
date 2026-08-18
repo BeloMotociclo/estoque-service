@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 
 public record PecaRequestDTO(
         @NotBlank String codigo,
+        @NotBlank String nome,
         @NotNull Integer quantidade,
         @NotBlank String categoria,
         String marca,
