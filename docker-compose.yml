@@ -10,6 +10,17 @@ services:
     volumes:
       - db_estoque_data:/var/lib/postgresql/data
 
+  db-financeiro:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: financeiro
+      POSTGRES_USER: financeiro_user
+      POSTGRES_PASSWORD: financeiro_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_financeiro_data:/var/lib/postgresql/data
+
   rabbitmq:
     image: rabbitmq:3-management
     ports:
@@ -33,4 +44,5 @@ services:
 
 volumes:
   db_estoque_data:
+  db_financeiro_data:
   minio_data:
