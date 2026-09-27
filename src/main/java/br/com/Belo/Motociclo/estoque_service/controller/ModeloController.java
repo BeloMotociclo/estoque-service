@@ -2,7 +2,11 @@ package br.com.Belo.Motociclo.estoque_service.controller;
 
 import br.com.Belo.Motociclo.estoque_service.dto.ModeloRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ModeloResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.PecaDoModeloResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.PecaIdRequestDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.ServentiaResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.service.ModeloService;
+import br.com.Belo.Motociclo.estoque_service.service.ServentiaService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +19,11 @@ import java.util.List;
 public class ModeloController {
 
     private final ModeloService service;
+    private final ServentiaService serventiaService;
 
-    public ModeloController(ModeloService service) {
+    public ModeloController(ModeloService service, ServentiaService serventiaService) {
         this.service = service;
+        this.serventiaService = serventiaService;
     }
 
     @PostMapping
@@ -35,6 +41,19 @@ public class ModeloController {
             @PathVariable Long id,
             @Valid @RequestBody ModeloRequestDTO dto) {
         return ResponseEntity.ok(service.atualizar(id, dto));
+    }
+
+    @GetMapping("/{id}/pecas")
+    public ResponseEntity<List<PecaDoModeloResponseDTO>> listarPecas(@PathVariable Long id) {
+        return ResponseEntity.ok(serventiaService.listarPecasPorModelo(id));
+    }
+
+    @PostMapping("/{id}/pecas")
+    public ResponseEntity<ServentiaResponseDTO> vincularPeca(
+            @PathVariable Long id,
+            @Valid @RequestBody PecaIdRequestDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(serventiaService.vincularPeca(id, dto.pecaId()));
     }
 
     @DeleteMapping("/{id}")

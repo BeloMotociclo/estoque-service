@@ -12,6 +12,7 @@ import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaFornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public class PecaFornecedorService {
         return new PecaFornecedorResponseDTO(salvo.getId(), fornecedor.getId(), fornecedor.getNome());
     }
 
+    @Transactional(readOnly = true)
     public List<PecaFornecedorResponseDTO> listarPorPeca(UUID pecaId) {
         return pecaFornecedorRepository.findByPecaId(pecaId)
                 .stream()
