@@ -1,8 +1,10 @@
 spring:
+  application:
+    name: estoque-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/estoque
-    username: estoque_user
-    password: estoque_pass
+    url: ${ESTOQUE_DB_URL:jdbc:postgresql://localhost:5432/estoque}
+    username: ${ESTOQUE_DB_USERNAME:estoque_user}
+    password: ${ESTOQUE_DB_PASSWORD:estoque_pass}
   jpa:
     hibernate:
       ddl-auto: validate   # nunca "update" — quem cria/altera tabela é o Flyway
@@ -13,13 +15,20 @@ spring:
     locations: classpath:db/migration
     clean-disabled: false
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: admin
-    password: admin123
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin123}
 
 minio:
-  url: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin
-  bucket: oficina
+  url: ${MINIO_URL:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:oficina}
+
+jwt:
+  secret: ${JWT_SECRET:sua-chave-secreta-bem-longa-aqui-minimo-256-bits}
+  expiracao: ${JWT_EXPIRACAO:86400000}
+
+server:
+  port: 8081
