@@ -1,8 +1,11 @@
 package br.com.Belo.Motociclo.estoque_service.controller;
 
+import br.com.Belo.Motociclo.estoque_service.dto.ConsultaNotaFiscalRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.HistoricoPrecoResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalManualRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.service.NotaFiscalService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -24,15 +27,30 @@ public class NotaFiscalController {
         this.service = service;
     }
 
+    @PostMapping
+    public ResponseEntity<NotaFiscalResponseDTO> cadastrar(
+            @Valid @RequestBody NotaFiscalManualRequestDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.cadastrarManualmente(request));
+    }
+
     @PostMapping(value = "/importar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<NotaFiscalResponseDTO> importar(
             @RequestParam("arquivo") MultipartFile arquivo) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.importar(arquivo));
     }
 
+    @PostMapping("/consultar-sefaz")
+    public ResponseEntity<Void> consultarSefaz(
+            @Valid @RequestBody ConsultaNotaFiscalRequestDTO request) {
+        service.consultarSefaz(request.chaveAcesso());
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping
-    public ResponseEntity<Page<NotaFiscalResponseDTO>> listar(Pageable pageable) {
-        return ResponseEntity.ok(service.listar(pageable));
+    public ResponseEntity<Page<NotaFiscalResponseDTO>> listar(
+            @RequestParam(required = false) UUID fornecedorId,
+            Pageable pageable) {
+        return ResponseEntity.ok(service.listar(fornecedorId, pageable));
     }
 
     @GetMapping("/pecas/{pecaId}/historico-precos")

@@ -3,6 +3,7 @@ package br.com.Belo.Motociclo.estoque_service.service;
 import br.com.Belo.Motociclo.estoque_service.dto.HistoricoPrecoResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ItemNotaFiscalDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalImportadaDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalManualRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
 import br.com.Belo.Motociclo.estoque_service.entity.Fornecedor;
@@ -11,14 +12,15 @@ import br.com.Belo.Motociclo.estoque_service.entity.NotaFiscal;
 import br.com.Belo.Motociclo.estoque_service.entity.Peca;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
 import br.com.Belo.Motociclo.estoque_service.exception.RegraNegocioException;
+import br.com.Belo.Motociclo.estoque_service.exception.SefazIndisponivelException;
 import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.HistoricoPrecoRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.NotaFiscalRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -116,15 +118,54 @@ public class NotaFiscalService {
         nota.setData(dadosXml.data());
         nota = notaFiscalRepository.save(nota);
 
-        // Processa os itens — atualiza estoque e registra histórico de preço
-        List<HistoricoPrecoResponseDTO> itensProcessados = new ArrayList<>();
-        List<String> pecasNaoCadastradas = new ArrayList<>();
+        // Processa os itens — atualiza estoque e registra histórico de preço com a quantidade
+        List<HistoricoPrecoResponseDTO> itensProcessados =
+                processarItens(nota, fornecedor, dadosXml.data(), dadosXml.itens());
 
-        for (ItemNotaFiscalDTO item : dadosXml.itens()) {
+        logService.registrar("NotaFiscal", nota.getId().toString(), AcaoLog.CRIACAO,
+                "Nota fiscal importada: " + nota.getNumero());
+        return toResponseDTO(nota, fornecedor, itensProcessados);
+    }
+
+    @Transactional
+    public NotaFiscalResponseDTO cadastrarManualmente(NotaFiscalManualRequestDTO dto) {
+        Fornecedor fornecedor = fornecedorRepository.findByIdAndAtivoTrue(dto.fornecedorId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Fornecedor com id " + dto.fornecedorId() + " não encontrado"));
+
+        if (dto.chaveAcesso() != null && !dto.chaveAcesso().isBlank()
+                && notaFiscalRepository.existsByChaveAcesso(dto.chaveAcesso())) {
+            throw new RegraNegocioException("Nota fiscal já importada anteriormente");
+        }
+
+        if (notaFiscalRepository.existsByFornecedorIdAndNumero(fornecedor.getId(), dto.numero())) {
+            throw new RegraNegocioException("Nota fiscal já importada anteriormente");
+        }
+
+        NotaFiscal nota = new NotaFiscal();
+        nota.setFornecedor(fornecedor);
+        nota.setNumero(dto.numero());
+        nota.setChaveAcesso(dto.chaveAcesso() != null && dto.chaveAcesso().isBlank() ? null : dto.chaveAcesso());
+        nota.setValorTotal(dto.valorTotal());
+        nota.setData(dto.data());
+        nota = notaFiscalRepository.save(nota);
+
+        List<HistoricoPrecoResponseDTO> itensProcessados =
+                processarItens(nota, fornecedor, dto.data(), dto.itens());
+
+        logService.registrar("NotaFiscal", nota.getId().toString(), AcaoLog.CRIACAO,
+                "Nota fiscal cadastrada: " + nota.getNumero());
+        return toResponseDTO(nota, fornecedor, itensProcessados);
+    }
+
+    private List<HistoricoPrecoResponseDTO> processarItens(NotaFiscal nota, Fornecedor fornecedor,
+                                                           LocalDate data, List<ItemNotaFiscalDTO> itens) {
+        List<HistoricoPrecoResponseDTO> itensProcessados = new ArrayList<>();
+
+        for (ItemNotaFiscalDTO item : itens) {
             Optional<Peca> pecaOpt = pecaRepository.findByCodigoAndAtivoTrue(item.codigoPeca());
 
             if (pecaOpt.isEmpty()) {
-                pecasNaoCadastradas.add(item.codigoPeca());
                 continue;
             }
 
@@ -140,51 +181,70 @@ public class NotaFiscalService {
             historico.setFornecedor(fornecedor);
             historico.setNotaFiscal(nota);
             historico.setPrecoCompra(item.precoUnitario());
-            historico.setData(dadosXml.data());
+            historico.setData(data);
+            historico.setQuantidade(item.quantidade());
             HistoricoPreco salvo = historicoPrecoRepository.save(historico);
 
-            itensProcessados.add(new HistoricoPrecoResponseDTO(
-                    salvo.getId(), peca.getId(), peca.getCodigo(), salvo.getPrecoCompra(), salvo.getData()
-            ));
+            itensProcessados.add(toHistoricoDTO(salvo));
         }
 
-        // Avisa quais peças do XML não estavam cadastradas
-        if (!pecasNaoCadastradas.isEmpty()) {
-            System.out.println("Peças não cadastradas no sistema: " + pecasNaoCadastradas);
-            // futuramente pode virar um campo na response
-        }
+        return itensProcessados;
+    }
 
-        NotaFiscal notaFinal = nota;
-        logService.registrar("NotaFiscal", notaFinal.getId().toString(), AcaoLog.CRIACAO,
-                "Nota fiscal importada: " + notaFinal.getNumero());
+    private HistoricoPrecoResponseDTO toHistoricoDTO(HistoricoPreco h) {
+        return new HistoricoPrecoResponseDTO(
+                h.getId(), h.getPeca().getId(), h.getPeca().getCodigo(), h.getPeca().getNome(),
+                h.getPrecoCompra(), h.getData(), h.getQuantidade());
+    }
+
+    private NotaFiscalResponseDTO toResponseDTO(NotaFiscal nota, Fornecedor fornecedor,
+                                                List<HistoricoPrecoResponseDTO> itens) {
         return new NotaFiscalResponseDTO(
-                notaFinal.getId(), fornecedor.getId(), fornecedor.getNome(),
-                notaFinal.getNumero(), notaFinal.getChaveAcesso(),
-                notaFinal.getValorTotal(), notaFinal.getData(), itensProcessados
+                nota.getId(), fornecedor.getId(), fornecedor.getNome(),
+                nota.getNumero(), nota.getChaveAcesso(),
+                nota.getValorTotal(), nota.getData(), itens
         );
     }
 
-    public Page<NotaFiscalResponseDTO> listar(Pageable pageable) {
-        return notaFiscalRepository.findAllByAtivoTrue(pageable).map(nota ->
+    // Consulta na SEFAZ pela chave de acesso (44 dígitos).
+    // A integração real com o WS demanda certificado digital A1, configurado via
+    // variáveis de ambiente NFE_CERT_FILE/NFE_CERT_SENHA. Sem certificado, retorna 503.
+    public void consultarSefaz(String chaveAcesso) {
+        if (certificadoSefazConfigurado()) {
+            throw new SefazIndisponivelException("Consulta SEFAZ indisponível: integração ainda não ativada");
+        }
+        throw new SefazIndisponivelException(
+                "Consulta SEFAZ indisponível: certificado digital não configurado");
+    }
+
+    private boolean certificadoSefazConfigurado() {
+        String arquivo = System.getenv("NFE_CERT_FILE");
+        String senha = System.getenv("NFE_CERT_SENHA");
+        return arquivo != null && !arquivo.isBlank() && senha != null && !senha.isBlank();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<NotaFiscalResponseDTO> listar(UUID fornecedorId, Pageable pageable) {
+        Page<NotaFiscal> notas = fornecedorId != null
+                ? notaFiscalRepository.findAllByAtivoTrueAndFornecedorId(fornecedorId, pageable)
+                : notaFiscalRepository.findAllByAtivoTrue(pageable);
+        return notas.map(nota ->
                 new NotaFiscalResponseDTO(
                         nota.getId(), nota.getFornecedor().getId(), nota.getFornecedor().getNome(),
                         nota.getNumero(), nota.getChaveAcesso(), nota.getValorTotal(), nota.getData(),
                         historicoPrecoRepository.findByNotaFiscalIdOrderByDataDesc(nota.getId())
                                 .stream()
-                                .map(h -> new HistoricoPrecoResponseDTO(
-                                        h.getId(), h.getPeca().getId(), h.getPeca().getCodigo(),
-                                        h.getPrecoCompra(), h.getData()))
+                                .map(this::toHistoricoDTO)
                                 .toList()
                 )
         );
     }
 
+    @Transactional(readOnly = true)
     public List<HistoricoPrecoResponseDTO> historicoPrecosPorPeca(UUID pecaId) {
         return historicoPrecoRepository.findByPecaIdOrderByDataDesc(pecaId)
                 .stream()
-                .map(h -> new HistoricoPrecoResponseDTO(
-                        h.getId(), h.getPeca().getId(), h.getPeca().getCodigo(),
-                        h.getPrecoCompra(), h.getData()))
+                .map(this::toHistoricoDTO)
                 .toList();
     }
 }

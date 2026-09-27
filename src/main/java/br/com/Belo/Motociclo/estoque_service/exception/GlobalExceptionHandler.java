@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("erro", ex.getMessage()));
     }
 
+    @ExceptionHandler(SefazIndisponivelException.class)
+    public ResponseEntity<Map<String, String>> handleSefazIndisponivel(SefazIndisponivelException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("erro", ex.getMessage()));
+    }
+
     @ExceptionHandler(RegraNegocioException.class)
     public ResponseEntity<Map<String, String>> handleRegraNegocio(RegraNegocioException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

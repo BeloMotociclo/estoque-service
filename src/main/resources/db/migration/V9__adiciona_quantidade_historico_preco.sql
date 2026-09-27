@@ -1,0 +1,1 @@
+ALTER TABLE historico_preco ADD COLUMN quantidade INTEGER;

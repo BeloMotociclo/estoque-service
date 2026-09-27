@@ -13,5 +13,6 @@ public interface NotaFiscalRepository extends JpaRepository<NotaFiscal, UUID> {
     boolean existsByFornecedorIdAndNumero(UUID fornecedorId, String numero);
     boolean existsByChaveAcesso(String chaveAcesso);
     Page<NotaFiscal> findAllByAtivoTrue(Pageable pageable);
+    Page<NotaFiscal> findAllByAtivoTrueAndFornecedorId(UUID fornecedorId, Pageable pageable);
 }
 

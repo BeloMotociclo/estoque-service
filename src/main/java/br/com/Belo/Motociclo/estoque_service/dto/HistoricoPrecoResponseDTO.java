@@ -8,7 +8,9 @@ public record HistoricoPrecoResponseDTO(
         Long id,
         UUID pecaId,
         String pecaCodigo,
+        String pecaNome,
         BigDecimal precoCompra,
-        LocalDate data
+        LocalDate data,
+        Integer quantidade
 ) {
 }

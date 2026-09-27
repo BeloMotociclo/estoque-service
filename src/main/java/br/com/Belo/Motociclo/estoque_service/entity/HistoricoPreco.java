@@ -34,4 +34,7 @@ public class HistoricoPreco extends BaseEntity {
 
     @Column(nullable = false)
     private LocalDate data;
+
+    @Column
+    private Integer quantidade;
 }
