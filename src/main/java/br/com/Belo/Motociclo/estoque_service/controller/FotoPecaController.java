@@ -2,6 +2,7 @@ package br.com.Belo.Motociclo.estoque_service.controller;
 
 import br.com.Belo.Motociclo.estoque_service.dto.FotoPecaResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.service.FotoPecaService;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,5 +44,13 @@ public class FotoPecaController {
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/imagem")
+    public ResponseEntity<InputStreamResource> downloadFoto(@PathVariable Long id) {
+        var inputStream = service.download(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .body(new InputStreamResource(inputStream));
     }
 }

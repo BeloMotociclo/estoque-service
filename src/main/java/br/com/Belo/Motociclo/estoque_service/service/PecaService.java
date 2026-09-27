@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -26,11 +27,12 @@ public class PecaService {
         this.logService = logService;
     }
 
-    public PecaResponseDTO criar(PecaRequestDTO dto) {
+public PecaResponseDTO criar(PecaRequestDTO dto) {
         Peca peca = mapper.toEntity(dto);
+        peca.setCategoria(dto.categoria().trim().toUpperCase());
         Peca salvo = repository.save(peca);
         logService.registrar("Peca", salvo.getId().toString(), AcaoLog.CRIACAO,
-                "Peça criada: " + salvo.getCodigo());
+                "Pe��a criada: " + salvo.getCodigo());
         return mapper.toResponseDTO(salvo);
     }
 
@@ -40,8 +42,15 @@ public class PecaService {
         return mapper.toResponseDTO(peca);
     }
 
-    public Page<PecaResponseDTO> listar(Pageable pageable) {
-        return repository.findAllByAtivoTrue(pageable).map(mapper::toResponseDTO);
+    public Page<PecaResponseDTO> listar(Pageable pageable, boolean incluirInativas) {
+        var page = incluirInativas
+                ? repository.findAll(pageable)
+                : repository.findAllByAtivoTrue(pageable);
+        return page.map(mapper::toResponseDTO);
+    }
+
+    public List<String> listarCategorias() {
+        return repository.findAllCategorias();
     }
 
     public PecaResponseDTO atualizar(UUID id, PecaRequestDTO dto) {
@@ -50,12 +59,23 @@ public class PecaService {
         peca.setCodigo(dto.codigo());
         peca.setNome(dto.nome());
         peca.setQuantidade(dto.quantidade());
-        peca.setCategoria(dto.categoria());
+        peca.setCategoria(dto.categoria().trim().toUpperCase());
         peca.setMarca(dto.marca());
         peca.setPrecoVenda(dto.precoVenda());
+        peca.setAtivo(true); // editar uma peça inativa reativa
         Peca salvo = repository.save(peca);
         logService.registrar("Peca", salvo.getId().toString(), AcaoLog.EDICAO,
                 "Peça atualizada: " + salvo.getCodigo());
+        return mapper.toResponseDTO(salvo);
+    }
+
+    public PecaResponseDTO reativar(UUID id) {
+        Peca peca = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada"));
+        peca.setAtivo(true);
+        Peca salvo = repository.save(peca);
+        logService.registrar("Peca", id.toString(), AcaoLog.EDICAO,
+                "Peça reativada: " + salvo.getCodigo());
         return mapper.toResponseDTO(salvo);
     }
 

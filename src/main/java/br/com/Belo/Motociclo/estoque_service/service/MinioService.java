@@ -1,5 +1,6 @@
 package br.com.Belo.Motociclo.estoque_service.service;
 
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import br.com.Belo.Motociclo.estoque_service.config.MinioProperties;
 
+import java.io.InputStream;
 import java.util.UUID;
 
 @Service
@@ -50,6 +52,22 @@ public class MinioService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Erro ao deletar imagem: " + e.getMessage());
+        }
+    }
+
+    public InputStream download(String url) {
+        try {
+            String nomeArquivo = url.replace(
+                    properties.getUrl() + "/" + properties.getBucket() + "/", ""
+            );
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(properties.getBucket())
+                            .object(nomeArquivo)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao baixar imagem: " + e.getMessage());
         }
     }
 }

@@ -10,5 +10,6 @@ public record PecaResponseDTO(
         Integer quantidade,
         String categoria,
         String marca,
-        BigDecimal precoVenda
+        BigDecimal precoVenda,
+        boolean ativo
 ) {}

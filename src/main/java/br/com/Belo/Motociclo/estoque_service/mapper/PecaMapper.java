@@ -22,7 +22,8 @@ public class PecaMapper {
     public PecaResponseDTO toResponseDTO(Peca peca) {
         return new PecaResponseDTO(
                 peca.getId(), peca.getCodigo(), peca.getNome(), peca.getQuantidade(),
-                peca.getCategoria(), peca.getMarca(), peca.getPrecoVenda()
+                peca.getCategoria(), peca.getMarca(), peca.getPrecoVenda(),
+                Boolean.TRUE.equals(peca.getAtivo())
         );
     }
 }
