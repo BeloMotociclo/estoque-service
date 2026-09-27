@@ -2,6 +2,7 @@ package br.com.Belo.Motociclo.estoque_service.controller;
 
 import br.com.Belo.Motociclo.estoque_service.dto.FornecedorRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.FornecedorResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.service.FornecedorService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -17,9 +18,16 @@ import java.util.UUID;
 public class FornecedorController {
 
     private final FornecedorService service;
+    private final FornecedorRepository repository;
 
-    public FornecedorController(FornecedorService service) {
+    public FornecedorController(FornecedorService service, FornecedorRepository repository) {
         this.service = service;
+        this.repository = repository;
+    }
+
+    @GetMapping("/total")
+    public ResponseEntity<Long> total() {
+        return ResponseEntity.ok(repository.countByAtivoTrue());
     }
 
     @PostMapping

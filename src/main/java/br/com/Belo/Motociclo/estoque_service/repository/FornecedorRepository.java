@@ -12,6 +12,8 @@ import java.util.UUID;
 @Repository
 public interface FornecedorRepository extends JpaRepository<Fornecedor, UUID> {
     Optional<Fornecedor> findByCnpjAndAtivoTrue(String cnpj);
+    Optional<Fornecedor> findByIdAndAtivoTrue(UUID id);
     Page<Fornecedor> findAllByAtivoTrue(Pageable pageable);
+    long countByAtivoTrue();
 }
 
