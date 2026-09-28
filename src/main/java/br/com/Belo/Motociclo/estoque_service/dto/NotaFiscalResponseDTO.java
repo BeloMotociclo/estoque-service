@@ -13,6 +13,7 @@ public record NotaFiscalResponseDTO(
         String chaveAcesso,
         BigDecimal valorTotal,
         LocalDate data,
-        List<HistoricoPrecoResponseDTO> itens
+        List<HistoricoPrecoResponseDTO> itens,
+        List<ItemNotaPendenteResponseDTO> itensPendentes,
+        List<PecaCriadaDTO> pecasCriadas
 ) {}
-

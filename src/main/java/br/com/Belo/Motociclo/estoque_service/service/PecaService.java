@@ -42,10 +42,15 @@ public PecaResponseDTO criar(PecaRequestDTO dto) {
         return mapper.toResponseDTO(peca);
     }
 
-    public Page<PecaResponseDTO> listar(Pageable pageable, boolean incluirInativas) {
-        var page = incluirInativas
-                ? repository.findAll(pageable)
-                : repository.findAllByAtivoTrue(pageable);
+    public Page<PecaResponseDTO> listar(Pageable pageable, boolean incluirInativas, String q) {
+        Page<Peca> page;
+        if (q != null && !q.isBlank()) {
+            page = repository.buscar(q.trim(), incluirInativas, pageable);
+        } else {
+            page = incluirInativas
+                    ? repository.findAll(pageable)
+                    : repository.findAllByAtivoTrue(pageable);
+        }
         return page.map(mapper::toResponseDTO);
     }
 

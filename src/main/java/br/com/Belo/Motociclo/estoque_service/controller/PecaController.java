@@ -58,8 +58,9 @@ public class PecaController {
     @GetMapping
     public ResponseEntity<Page<PecaResponseDTO>> listar(
             Pageable pageable,
-            @RequestParam(value = "incluirInativas", defaultValue = "false") boolean incluirInativas) {
-        return ResponseEntity.ok(service.listar(pageable, incluirInativas));
+            @RequestParam(value = "incluirInativas", defaultValue = "false") boolean incluirInativas,
+            @RequestParam(value = "q", required = false) String q) {
+        return ResponseEntity.ok(service.listar(pageable, incluirInativas, q));
     }
 
     @PostMapping("/{id}/reativar")

@@ -1,21 +1,33 @@
 package br.com.Belo.Motociclo.estoque_service.service;
 
+import br.com.Belo.Motociclo.estoque_service.dto.CadastrarPecaPendenciaRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.HistoricoPrecoResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.ItemNotaFiscalDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.ItemNotaPendenteResponseDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalImportadaDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalManualRequestDTO;
 import br.com.Belo.Motociclo.estoque_service.dto.NotaFiscalResponseDTO;
+import br.com.Belo.Motociclo.estoque_service.dto.PecaCriadaDTO;
 import br.com.Belo.Motociclo.estoque_service.entity.AcaoLog;
+import br.com.Belo.Motociclo.estoque_service.entity.CodigoPeca;
 import br.com.Belo.Motociclo.estoque_service.entity.Fornecedor;
 import br.com.Belo.Motociclo.estoque_service.entity.HistoricoPreco;
+import br.com.Belo.Motociclo.estoque_service.entity.ItemNotaPendente;
 import br.com.Belo.Motociclo.estoque_service.entity.NotaFiscal;
 import br.com.Belo.Motociclo.estoque_service.entity.Peca;
+import br.com.Belo.Motociclo.estoque_service.entity.PecaFornecedor;
+import br.com.Belo.Motociclo.estoque_service.entity.ResolucaoPendente;
+import br.com.Belo.Motociclo.estoque_service.entity.StatusItemPendente;
+import br.com.Belo.Motociclo.estoque_service.entity.TipoCodigoPeca;
 import br.com.Belo.Motociclo.estoque_service.exception.RecursoNaoEncontradoException;
 import br.com.Belo.Motociclo.estoque_service.exception.RegraNegocioException;
 import br.com.Belo.Motociclo.estoque_service.exception.SefazIndisponivelException;
+import br.com.Belo.Motociclo.estoque_service.repository.CodigoPecaRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.FornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.HistoricoPrecoRepository;
+import br.com.Belo.Motociclo.estoque_service.repository.ItemNotaPendenteRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.NotaFiscalRepository;
+import br.com.Belo.Motociclo.estoque_service.repository.PecaFornecedorRepository;
 import br.com.Belo.Motociclo.estoque_service.repository.PecaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +44,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -42,17 +53,26 @@ public class NotaFiscalService {
     private final FornecedorRepository fornecedorRepository;
     private final PecaRepository pecaRepository;
     private final HistoricoPrecoRepository historicoPrecoRepository;
+    private final CodigoPecaRepository codigoPecaRepository;
+    private final ItemNotaPendenteRepository itemNotaPendenteRepository;
+    private final PecaFornecedorRepository pecaFornecedorRepository;
     private final LogAlteracaoService logService;
 
     public NotaFiscalService(NotaFiscalRepository notaFiscalRepository,
                              FornecedorRepository fornecedorRepository,
                              PecaRepository pecaRepository,
                              HistoricoPrecoRepository historicoPrecoRepository,
+                             CodigoPecaRepository codigoPecaRepository,
+                             ItemNotaPendenteRepository itemNotaPendenteRepository,
+                             PecaFornecedorRepository pecaFornecedorRepository,
                              LogAlteracaoService logService) {
         this.notaFiscalRepository = notaFiscalRepository;
         this.fornecedorRepository = fornecedorRepository;
         this.pecaRepository = pecaRepository;
         this.historicoPrecoRepository = historicoPrecoRepository;
+        this.codigoPecaRepository = codigoPecaRepository;
+        this.itemNotaPendenteRepository = itemNotaPendenteRepository;
+        this.pecaFornecedorRepository = pecaFornecedorRepository;
         this.logService = logService;
     }
 
@@ -82,7 +102,9 @@ public class NotaFiscalService {
                 Integer quantidade = new BigDecimal(
                         det.getElementsByTagName("qCom").item(0).getTextContent()
                 ).intValue();
-                itens.add(new ItemNotaFiscalDTO(codigo, preco, quantidade));
+                String descricao = det.getElementsByTagName("xProd").getLength() > 0
+                        ? det.getElementsByTagName("xProd").item(0).getTextContent() : null;
+                itens.add(new ItemNotaFiscalDTO(codigo, preco, quantidade, descricao));
             }
 
             return new NotaFiscalImportadaDTO(numero, chaveAcesso, cnpjFornecedor, valorTotal, data, itens);
@@ -93,11 +115,12 @@ public class NotaFiscalService {
     }
 
     @Transactional
-    public NotaFiscalResponseDTO importar(MultipartFile arquivo) {
+    public NotaFiscalResponseDTO importar(MultipartFile arquivo, boolean criarPecasAutomaticamente) {
         NotaFiscalImportadaDTO dadosXml = parseXml(arquivo);
 
-        // Valida se nota já existe
-        Fornecedor fornecedor = fornecedorRepository.findByCnpjAndAtivoTrue(dadosXml.cnpjFornecedor())
+        String cnpjNumeros = dadosXml.cnpjFornecedor() == null
+                ? "" : dadosXml.cnpjFornecedor().replaceAll("\\D", "");
+        Fornecedor fornecedor = fornecedorRepository.buscarAtivoPorCnpjNormalizado(cnpjNumeros)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Fornecedor com CNPJ " + dadosXml.cnpjFornecedor() + " não cadastrado"));
 
@@ -109,7 +132,6 @@ public class NotaFiscalService {
             throw new RegraNegocioException("Nota fiscal já importada anteriormente");
         }
 
-        // Salva a nota fiscal
         NotaFiscal nota = new NotaFiscal();
         nota.setFornecedor(fornecedor);
         nota.setNumero(dadosXml.numero());
@@ -118,17 +140,16 @@ public class NotaFiscalService {
         nota.setData(dadosXml.data());
         nota = notaFiscalRepository.save(nota);
 
-        // Processa os itens — atualiza estoque e registra histórico de preço com a quantidade
-        List<HistoricoPrecoResponseDTO> itensProcessados =
-                processarItens(nota, fornecedor, dadosXml.data(), dadosXml.itens());
+        Processamento processamento = processarItens(nota, fornecedor, dadosXml.data(),
+                dadosXml.itens(), criarPecasAutomaticamente);
 
         logService.registrar("NotaFiscal", nota.getId().toString(), AcaoLog.CRIACAO,
                 "Nota fiscal importada: " + nota.getNumero());
-        return toResponseDTO(nota, fornecedor, itensProcessados);
+        return toResponseDTO(nota, fornecedor, processamento);
     }
 
     @Transactional
-    public NotaFiscalResponseDTO cadastrarManualmente(NotaFiscalManualRequestDTO dto) {
+    public NotaFiscalResponseDTO cadastrarManualmente(NotaFiscalManualRequestDTO dto, boolean criarPecasAutomaticamente) {
         Fornecedor fornecedor = fornecedorRepository.findByIdAndAtivoTrue(dto.fornecedorId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Fornecedor com id " + dto.fornecedorId() + " não encontrado"));
@@ -150,45 +171,226 @@ public class NotaFiscalService {
         nota.setData(dto.data());
         nota = notaFiscalRepository.save(nota);
 
-        List<HistoricoPrecoResponseDTO> itensProcessados =
-                processarItens(nota, fornecedor, dto.data(), dto.itens());
+        Processamento processamento = processarItens(nota, fornecedor, dto.data(),
+                dto.itens(), criarPecasAutomaticamente);
 
         logService.registrar("NotaFiscal", nota.getId().toString(), AcaoLog.CRIACAO,
                 "Nota fiscal cadastrada: " + nota.getNumero());
-        return toResponseDTO(nota, fornecedor, itensProcessados);
+        return toResponseDTO(nota, fornecedor, processamento);
     }
 
-    private List<HistoricoPrecoResponseDTO> processarItens(NotaFiscal nota, Fornecedor fornecedor,
-                                                           LocalDate data, List<ItemNotaFiscalDTO> itens) {
-        List<HistoricoPrecoResponseDTO> itensProcessados = new ArrayList<>();
+    private record Processamento(List<HistoricoPrecoResponseDTO> processados,
+                                 List<ItemNotaPendente> pendentes,
+                                 List<Peca> criadas) {}
+
+    private Processamento processarItens(NotaFiscal nota, Fornecedor fornecedor,
+                                         LocalDate data, List<ItemNotaFiscalDTO> itens,
+                                         boolean criarPecasAutomaticamente) {
+        List<HistoricoPrecoResponseDTO> processados = new ArrayList<>();
+        List<ItemNotaPendente> pendentes = new ArrayList<>();
+        List<Peca> criadas = new ArrayList<>();
 
         for (ItemNotaFiscalDTO item : itens) {
-            Optional<Peca> pecaOpt = pecaRepository.findByCodigoAndAtivoTrue(item.codigoPeca());
+            Peca peca = resolverPeca(fornecedor, item);
 
-            if (pecaOpt.isEmpty()) {
+            if (peca == null && criarPecasAutomaticamente && !pecaRepository.existsByCodigo(item.codigoPeca())) {
+                peca = criarPecaAutomatica(fornecedor, item);
+                criadas.add(peca);
+            }
+
+            if (peca == null) {
+                pendentes.add(criarPendencia(nota, item));
                 continue;
             }
 
-            Peca peca = pecaOpt.get();
-
-            // Atualiza quantidade em estoque
-            peca.setQuantidade(peca.getQuantidade() + item.quantidade());
-            pecaRepository.save(peca);
-
-            // Registra histórico de preço
-            HistoricoPreco historico = new HistoricoPreco();
-            historico.setPeca(peca);
-            historico.setFornecedor(fornecedor);
-            historico.setNotaFiscal(nota);
-            historico.setPrecoCompra(item.precoUnitario());
-            historico.setData(data);
-            historico.setQuantidade(item.quantidade());
-            HistoricoPreco salvo = historicoPrecoRepository.save(historico);
-
-            itensProcessados.add(toHistoricoDTO(salvo));
+            processados.add(processarItem(nota, fornecedor, data, peca, item));
         }
 
-        return itensProcessados;
+        return new Processamento(processados, pendentes, criadas);
+    }
+
+    private Peca resolverPeca(Fornecedor fornecedor, ItemNotaFiscalDTO item) {
+        var mapeado = codigoPecaRepository.findFirstByTipoAndFornecedorIdAndCodigo(
+                TipoCodigoPeca.FORNECEDOR, fornecedor.getId(), item.codigoPeca());
+        if (mapeado.isPresent() && Boolean.TRUE.equals(mapeado.get().getPeca().getAtivo())) {
+            return mapeado.get().getPeca();
+        }
+        return pecaRepository.findByCodigoAndAtivoTrue(item.codigoPeca()).orElse(null);
+    }
+
+    private Peca criarPecaAutomatica(Fornecedor fornecedor, ItemNotaFiscalDTO item) {
+        Peca peca = new Peca();
+        peca.setCodigo(item.codigoPeca());
+        peca.setNome(item.descricao() != null && !item.descricao().isBlank()
+                ? item.descricao().trim() : item.codigoPeca());
+        peca.setCategoria("A CLASSIFICAR");
+        peca.setPrecoVenda(item.precoUnitario());
+        peca.setQuantidade(0);
+        peca.setAtivo(true);
+        peca = pecaRepository.save(peca);
+        registrarCodigoFornecedor(peca, fornecedor, item.codigoPeca(), item.descricao());
+        logService.registrar("Peca", peca.getId().toString(), AcaoLog.CRIACAO,
+                "Peça criada automaticamente pela nota: " + peca.getCodigo());
+        return peca;
+    }
+
+    private HistoricoPrecoResponseDTO processarItem(NotaFiscal nota, Fornecedor fornecedor,
+                                                    LocalDate data, Peca peca, ItemNotaFiscalDTO item) {
+        peca.setQuantidade(peca.getQuantidade() + item.quantidade());
+        pecaRepository.save(peca);
+
+        HistoricoPreco historico = new HistoricoPreco();
+        historico.setPeca(peca);
+        historico.setFornecedor(fornecedor);
+        historico.setNotaFiscal(nota);
+        historico.setPrecoCompra(item.precoUnitario());
+        historico.setData(data);
+        historico.setQuantidade(item.quantidade());
+        HistoricoPreco salvo = historicoPrecoRepository.save(historico);
+
+        return toHistoricoDTO(salvo);
+    }
+
+    private void registrarCodigoFornecedor(Peca peca, Fornecedor fornecedor, String codigo, String descricao) {
+        if (!codigoPecaRepository.existsByTipoAndFornecedorIdAndCodigo(
+                TipoCodigoPeca.FORNECEDOR, fornecedor.getId(), codigo)) {
+            CodigoPeca codigoPeca = new CodigoPeca();
+            codigoPeca.setPeca(peca);
+            codigoPeca.setTipo(TipoCodigoPeca.FORNECEDOR);
+            codigoPeca.setFornecedor(fornecedor);
+            codigoPeca.setCodigo(codigo);
+            codigoPeca.setDescricao(descricao);
+            codigoPecaRepository.save(codigoPeca);
+        }
+        if (!pecaFornecedorRepository.existsByPecaIdAndFornecedorId(peca.getId(), fornecedor.getId())) {
+            PecaFornecedor vinculo = new PecaFornecedor();
+            vinculo.setPeca(peca);
+            vinculo.setFornecedor(fornecedor);
+            pecaFornecedorRepository.save(vinculo);
+        }
+    }
+
+    private ItemNotaPendente criarPendencia(NotaFiscal nota, ItemNotaFiscalDTO item) {
+        ItemNotaPendente pendente = new ItemNotaPendente();
+        pendente.setNotaFiscal(nota);
+        pendente.setCodigo(item.codigoPeca());
+        pendente.setDescricao(item.descricao());
+        pendente.setQuantidade(item.quantidade());
+        pendente.setPrecoUnitario(item.precoUnitario());
+        pendente.setStatus(StatusItemPendente.PENDENTE);
+        return itemNotaPendenteRepository.save(pendente);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ItemNotaPendenteResponseDTO> listarItensPendentes(UUID notaId) {
+        return itemNotaPendenteRepository.findByNotaFiscalIdOrderByIdAsc(notaId)
+                .stream().map(this::toPendenteDTO).toList();
+    }
+
+    @Transactional
+    public ItemNotaPendenteResponseDTO vincularPendencia(Long pendenteId, UUID pecaId) {
+        ItemNotaPendente pendente = buscarPendenteAberto(pendenteId);
+        Peca peca = pecaRepository.findById(pecaId)
+                .filter(p -> Boolean.TRUE.equals(p.getAtivo()))
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Peça não encontrada ou inativa"));
+        validarCodigoDisponivel(pendente, peca);
+
+        Fornecedor fornecedor = pendente.getNotaFiscal().getFornecedor();
+        processarItem(pendente.getNotaFiscal(), fornecedor, pendente.getNotaFiscal().getData(), peca,
+                new ItemNotaFiscalDTO(pendente.getCodigo(), pendente.getPrecoUnitario(),
+                        pendente.getQuantidade(), pendente.getDescricao()));
+        registrarCodigoFornecedor(peca, fornecedor, pendente.getCodigo(), pendente.getDescricao());
+        resolver(pendente, peca, ResolucaoPendente.PECA_VINCULADA);
+
+        logService.registrar("NotaFiscal", pendente.getNotaFiscal().getId().toString(),
+                AcaoLog.EDICAO, "Item da nota vinculado à peça: " + peca.getCodigo());
+        return toPendenteDTO(pendente);
+    }
+
+    @Transactional
+    public ItemNotaPendenteResponseDTO cadastrarPecaParaPendencia(Long pendenteId,
+                                                                  CadastrarPecaPendenciaRequestDTO dto) {
+        ItemNotaPendente pendente = buscarPendenteAberto(pendenteId);
+        Fornecedor fornecedor = pendente.getNotaFiscal().getFornecedor();
+
+        String codigo = dto.codigo() != null && !dto.codigo().isBlank()
+                ? dto.codigo().trim() : pendente.getCodigo();
+
+        if (pecaRepository.existsByCodigo(codigo)) {
+            throw new RegraNegocioException("Já existe peça com o código " + codigo
+                    + " — use 'vincular' para ligar a uma peça existente");
+        }
+        if (codigoPecaRepository.existsByTipoAndFornecedorIdAndCodigo(
+                TipoCodigoPeca.FORNECEDOR, fornecedor.getId(), codigo)) {
+            throw new RegraNegocioException("O código " + codigo
+                    + " já está vinculado a uma peça deste fornecedor — use 'vincular'");
+        }
+
+        Peca peca = new Peca();
+        peca.setCodigo(codigo);
+        peca.setNome(dto.nome().trim());
+        peca.setCategoria(dto.categoria() == null || dto.categoria().isBlank()
+                ? "A CLASSIFICAR" : dto.categoria().trim().toUpperCase());
+        peca.setMarca(dto.marca());
+        peca.setPrecoVenda(dto.precoVenda());
+        peca.setQuantidade(0);
+        peca.setAtivo(true);
+        peca = pecaRepository.save(peca);
+
+        processarItem(pendente.getNotaFiscal(), fornecedor, pendente.getNotaFiscal().getData(), peca,
+                new ItemNotaFiscalDTO(codigo, pendente.getPrecoUnitario(),
+                        pendente.getQuantidade(), pendente.getDescricao()));
+        registrarCodigoFornecedor(peca, fornecedor, codigo, pendente.getDescricao());
+        resolver(pendente, peca, ResolucaoPendente.PECA_CRIADA);
+
+        logService.registrar("Peca", peca.getId().toString(), AcaoLog.CRIACAO,
+                "Peça criada pela pendência da nota: " + peca.getCodigo());
+        return toPendenteDTO(pendente);
+    }
+
+    @Transactional
+    public ItemNotaPendenteResponseDTO descartarPendencia(Long pendenteId) {
+        ItemNotaPendente pendente = buscarPendenteAberto(pendenteId);
+        resolver(pendente, null, ResolucaoPendente.DESCARTADA);
+        return toPendenteDTO(pendente);
+    }
+
+    private ItemNotaPendente buscarPendenteAberto(Long id) {
+        ItemNotaPendente pendente = itemNotaPendenteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Item pendente não encontrado"));
+        if (pendente.getStatus() != StatusItemPendente.PENDENTE) {
+            throw new RegraNegocioException("Item já foi "
+                    + (pendente.getStatus() == StatusItemPendente.RESOLVIDA ? "resolvido" : "descartado"));
+        }
+        return pendente;
+    }
+
+    private void validarCodigoDisponivel(ItemNotaPendente pendente, Peca peca) {
+        codigoPecaRepository.findFirstByTipoAndFornecedorIdAndCodigo(
+                        TipoCodigoPeca.FORNECEDOR, pendente.getNotaFiscal().getFornecedor().getId(),
+                        pendente.getCodigo())
+                .filter(cp -> !cp.getPeca().getId().equals(peca.getId()))
+                .ifPresent(cp -> {
+                    throw new RegraNegocioException("O código " + pendente.getCodigo()
+                            + " já está vinculado à peça " + cp.getPeca().getCodigo());
+                });
+    }
+
+    private void resolver(ItemNotaPendente pendente, Peca peca, ResolucaoPendente resolucao) {
+        pendente.setStatus(resolucao == ResolucaoPendente.DESCARTADA
+                ? StatusItemPendente.DESCARTADA : StatusItemPendente.RESOLVIDA);
+        pendente.setResolucao(resolucao);
+        pendente.setPeca(peca);
+        itemNotaPendenteRepository.save(pendente);
+    }
+
+    private ItemNotaPendenteResponseDTO toPendenteDTO(ItemNotaPendente p) {
+        return new ItemNotaPendenteResponseDTO(
+                p.getId(), p.getCodigo(), p.getDescricao(), p.getQuantidade(), p.getPrecoUnitario(),
+                p.getStatus(), p.getResolucao(),
+                p.getPeca() != null ? p.getPeca().getId() : null,
+                p.getPeca() != null ? p.getPeca().getCodigo() : null,
+                p.getPeca() != null ? p.getPeca().getNome() : null);
     }
 
     private HistoricoPrecoResponseDTO toHistoricoDTO(HistoricoPreco h) {
@@ -198,11 +400,15 @@ public class NotaFiscalService {
     }
 
     private NotaFiscalResponseDTO toResponseDTO(NotaFiscal nota, Fornecedor fornecedor,
-                                                List<HistoricoPrecoResponseDTO> itens) {
+                                                Processamento processamento) {
         return new NotaFiscalResponseDTO(
                 nota.getId(), fornecedor.getId(), fornecedor.getNome(),
                 nota.getNumero(), nota.getChaveAcesso(),
-                nota.getValorTotal(), nota.getData(), itens
+                nota.getValorTotal(), nota.getData(), processamento.processados(),
+                processamento.pendentes().stream().map(this::toPendenteDTO).toList(),
+                processamento.criadas().stream()
+                        .map(p -> new PecaCriadaDTO(p.getId(), p.getCodigo(), p.getNome()))
+                        .toList()
         );
     }
 
@@ -235,7 +441,13 @@ public class NotaFiscalService {
                         historicoPrecoRepository.findByNotaFiscalIdOrderByDataDesc(nota.getId())
                                 .stream()
                                 .map(this::toHistoricoDTO)
-                                .toList()
+                                .toList(),
+                        itemNotaPendenteRepository.findByNotaFiscalIdAndStatusOrderByIdAsc(
+                                        nota.getId(), StatusItemPendente.PENDENTE)
+                                .stream()
+                                .map(this::toPendenteDTO)
+                                .toList(),
+                        List.of()
                 )
         );
     }

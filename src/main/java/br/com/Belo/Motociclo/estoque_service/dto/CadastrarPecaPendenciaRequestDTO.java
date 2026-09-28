@@ -6,10 +6,10 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
-public record ItemNotaFiscalDTO(
-        @NotBlank String codigoPeca,
-        @NotNull @Positive BigDecimal precoUnitario,
-        @NotNull @Positive Integer quantidade,
-        String descricao
-) {
-}
+public record CadastrarPecaPendenciaRequestDTO(
+        String codigo,
+        @NotBlank String nome,
+        String categoria,
+        String marca,
+        @NotNull @Positive BigDecimal precoVenda
+) {}
