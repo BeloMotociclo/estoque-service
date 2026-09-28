@@ -40,6 +40,11 @@ public class PecaController {
         return ResponseEntity.ok(service.listarCategorias());
     }
 
+    @GetMapping("/marcas")
+    public ResponseEntity<List<String>> marcas() {
+        return ResponseEntity.ok(service.listarMarcas());
+    }
+
     @GetMapping("/serventias")
     public ResponseEntity<List<PecaServentiaDTO>> serventias() {
         return ResponseEntity.ok(serventiaService.listarTodas());
@@ -59,8 +64,11 @@ public class PecaController {
     public ResponseEntity<Page<PecaResponseDTO>> listar(
             Pageable pageable,
             @RequestParam(value = "incluirInativas", defaultValue = "false") boolean incluirInativas,
-            @RequestParam(value = "q", required = false) String q) {
-        return ResponseEntity.ok(service.listar(pageable, incluirInativas, q));
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "categoria", required = false) List<String> categoria,
+            @RequestParam(value = "marca", required = false) List<String> marca,
+            @RequestParam(value = "modeloId", required = false) Long modeloId) {
+        return ResponseEntity.ok(service.listar(pageable, incluirInativas, q, categoria, marca, modeloId));
     }
 
     @PostMapping("/{id}/reativar")

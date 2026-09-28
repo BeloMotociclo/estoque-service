@@ -42,20 +42,39 @@ public PecaResponseDTO criar(PecaRequestDTO dto) {
         return mapper.toResponseDTO(peca);
     }
 
-    public Page<PecaResponseDTO> listar(Pageable pageable, boolean incluirInativas, String q) {
-        Page<Peca> page;
-        if (q != null && !q.isBlank()) {
-            page = repository.buscar(q.trim(), incluirInativas, pageable);
-        } else {
-            page = incluirInativas
+    public Page<PecaResponseDTO> listar(Pageable pageable, boolean incluirInativas, String q,
+                                        List<String> categorias, List<String> marcas, Long modeloId) {
+        boolean semCategorias = categorias == null || categorias.isEmpty();
+        boolean semMarcas = marcas == null || marcas.isEmpty();
+        boolean semFiltro = semCategorias && semMarcas && modeloId == null
+                && (q == null || q.isBlank());
+
+        if (semFiltro) {
+            Page<Peca> page = incluirInativas
                     ? repository.findAll(pageable)
                     : repository.findAllByAtivoTrue(pageable);
+            return page.map(mapper::toResponseDTO);
         }
-        return page.map(mapper::toResponseDTO);
+
+        String termo = q != null && !q.isBlank() ? q.trim() : null;
+        List<String> categoriasNormalizadas = semCategorias
+                ? List.of("__none__")
+                : categorias.stream().map(String::toUpperCase).toList();
+        List<String> marcasNormalizadas = semMarcas ? List.of("__none__") : marcas;
+
+        return repository.buscar(termo, incluirInativas,
+                        semCategorias, categoriasNormalizadas,
+                        semMarcas, marcasNormalizadas,
+                        modeloId, pageable)
+                .map(mapper::toResponseDTO);
     }
 
     public List<String> listarCategorias() {
         return repository.findAllCategorias();
+    }
+
+    public List<String> listarMarcas() {
+        return repository.findAllMarcas();
     }
 
     public PecaResponseDTO atualizar(UUID id, PecaRequestDTO dto) {
